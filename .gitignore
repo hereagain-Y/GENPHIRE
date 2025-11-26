@@ -1,0 +1,87 @@
+# GENPHIRE Project - Git Ignore Rules
+
+# Environment and secrets
+.env
+*.env
+.env.local
+*_api_key.txt
+
+# API Keys and credentials
+api_key.txt
+secrets.txt
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Logs
+*.log
+logs/
+embedding_generation.log
+
+# Data files (large datasets)
+# Uncomment if you don't want to track large data files
+# data/*.csv
+# data/*.parquet
+# data/*.feather
+
+# Output files
+*_with_embeddings.csv
+output/
+results/
+*.pt
+*.pth
+*_predictions_*.csv
+*_metrics_*.csv
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
