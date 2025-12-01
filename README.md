@@ -35,8 +35,6 @@ Our findings highlight a **promising alternative strategy that complements exist
 
 ## Framework Overview
 
-![GENPHIRE Pipeline](Figure1_pipeline.png)
-
 GENPHIRE implements a **three-stage pipeline**:
 
 ### Stage 1: Genotype-to-Phenotype Translation 
