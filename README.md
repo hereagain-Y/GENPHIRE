@@ -83,9 +83,10 @@ GENPHIRE/
 │   ├── dataloader.py             # (Reference) Data loading utilities
 │   └── model_tranning.py         # (Reference) Extended training utilities
 ├── data/
-│   ├── toy_data.csv              # Example: Raw phenotype data (201 samples)
+│   ├── toy_data.csv              # Example: Raw phenotype data (200 samples)
 │   ├── toy_sentences.csv         # Generated: Natural language sentences
-│   └── toy_embeddings.csv        # Generated: LLM embeddings
+│   ├── toy_embeddings.csv        # Generated: LLM embeddings
+│   └── toy_phenotype.csv         # Example: Disease labels (200 samples)
 ├── results/                      # Output: Model predictions and metrics
 ├── Figure1_final.pdf             # Pipeline schematic diagram
 ├── README.md                     # This file
@@ -140,17 +141,64 @@ python code/genetic_setences.py \
 # Stage 2: Generate embeddings
 python code/get_emebedding.py \
     --input data/toy_sentences.csv \
-    --column_name sentence \
+    --column sentence \
     --output data/toy_embeddings.csv
 
 # Stage 3: Train prediction model
 python code/train_model.py \
     --input data/toy_embeddings.csv \
+    --labels data/toy_phenotype.csv \
+    --embedding_col embedding_gpt \
     --output_dir results \
-    --phenotype simulated_disease \
+    --phenotype toy_disease \
     --epochs 500 \
-    --patience 30
+    --patience 30 \
+    --save_model
 ```
+
+**Expected Output**:
+```
+✓ toy_sentences.csv (200 sentences)
+✓ toy_embeddings.csv (200 embeddings, 6.7 MB)
+✓ Training complete (140 train / 20 val / 40 test)
+✓ Results saved in results/toy_disease/
+```
+
+---
+
+## Toy Data Example
+
+The repository includes a complete toy dataset for testing:
+
+**Input Data**:
+- `toy_data.csv`: 200 samples with clinical covariates and genetic traits
+- `toy_phenotype.csv`: 200 disease labels (42 cases, 158 controls)
+
+**Generated Files**:
+- `toy_sentences.csv`: Natural language phenotype descriptions
+- `toy_embeddings.csv`: 1536-dimensional LLM embeddings (6.7 MB)
+
+**Training Results** (on toy data):
+```
+Model: FlexibleMLP (1536 → 512 → 256 → 128 → 1)
+Split: 140 train / 20 val / 40 test
+Loss: DynamicWeightedLoss (case weight: 3.67)
+Early stopping: Epoch 54
+Test ROC-AUC: 0.52 (baseline for simulated labels)
+```
+
+**Output Structure**:
+```
+results/toy_disease/
+├── toy_disease_train.pt (140 samples)
+├── toy_disease_val.pt (20 samples)  
+├── toy_disease_test.pt (40 samples)
+├── toy_disease_predictions_*.csv (test predictions)
+├── toy_disease_metrics_*.csv (performance metrics)
+└── best_model_weighted_bce.pth (trained model)
+```
+
+*Note: Performance is baseline because labels are simulated. With real UK Biobank phenotypes, expect ROC-AUC 0.65-0.85.*
 
 ---
 
@@ -220,6 +268,8 @@ python code/get_emebedding.py \
 ```bash
 python code/train_model.py \
     --input data/embeddings.csv \
+    --labels data/phenotype_labels.csv \
+    --label_col disease_status \
     --output_dir results \
     --phenotype disease_name \
     --embedding_col embedding \
@@ -241,7 +291,11 @@ python code/train_model.py \
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `--input` | Path to embeddings CSV | Required |
+| `--labels` | Path to phenotype labels CSV | Required |
+| `--label_col` | Label column name in labels file | `disease_status` |
 | `--phenotype` | Disease/trait name | `simulated_disease` |
+| `--embedding_col` | Embedding column name | `embedding` |
+| `--id_col` | ID column name | `ID` |
 | `--test_size` | Test set proportion | 0.2 |
 | `--val_size` | Validation set proportion | 0.1 |
 | `--hidden_dim` | MLP hidden layer size | 512 |
@@ -251,25 +305,6 @@ python code/train_model.py \
 | `--patience` | Early stopping patience | 30 |
 | `--save_model` | Save trained model | False |
 
-**Model Architecture** (FlexibleMLP):
-```
-Input (1536) 
-  ↓
-Linear + ReLU + Dropout (512)
-  ↓
-Linear + ReLU + Dropout (256)
-  ↓
-Linear + ReLU (128)
-  ↓
-Linear (1)
-  ↓
-Sigmoid → Disease Probability
-```
-
-**Loss Function**: DynamicWeightedLoss
-- Weighted binary cross-entropy
-- Automatically balances case/control ratio
-- Weight = (# controls) / (# cases)
 
 **Output Files**:
 ```
@@ -311,33 +346,32 @@ Based on UK Biobank validation:
 
 ### Using Real Phenotype Labels
 
-Replace simulated labels in `train_model.py` by providing a labels CSV:
+The `train_model.py` script accepts phenotype labels from a CSV file:
 
-```python
-# Load your phenotype data
-phenotype_df = pd.read_csv('phenotypes.csv')  # Columns: ID, disease_status
-
-# Merge with embeddings
-merged = embeddings_df.merge(phenotype_df, on='ID')
-y = merged['disease_status'].values  # Use real labels instead of simulated
+**Labels CSV Format**:
+```csv
+ID,disease_status
+1,0
+2,1
+3,0
+...
 ```
 
-### Custom Model Architecture
-
-To modify the model architecture, edit the `FlexibleMLP` class in `train_model.py`:
-
-```python
-class FlexibleMLP(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=512, dropout=0.3):
-        super().__init__()
-        self.net = nn.Sequential(
-            # Customize layers here
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            # Add more layers as needed
-        )
+**Usage**:
+```bash
+python code/train_model.py \
+    --input data/embeddings.csv \
+    --labels data/phenotype_labels.csv \
+    --label_col disease_status \
+    --phenotype disease_name \
+    --output_dir results
 ```
+
+The script will automatically:
+1. Load embeddings and labels
+2. Match samples by ID
+3. Report class distribution
+4. Train the model with real labels
 
 ### Hyperparameter Tuning
 
@@ -413,56 +447,7 @@ If you use GENPHIRE in your research, please cite:
 }
 ```
 
----
 
-## Contributing
-
-We welcome contributions! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
----
-
-## Contact
-
-**Principal Investigator**: [Your Name]  
-**Institution**: Emory University  
-**Lab**: Yao Lab  
-**Email**: [your.email@emory.edu]
-
-For questions, issues, or collaboration inquiries:
-- Open an issue on GitHub
-- Email the corresponding author
-- Visit our lab website: [link]
-
----
-
-## Acknowledgments
-
-- **UK Biobank**: Data resource (Application #XXXXX)
-- **OpenAI**: Embedding models (text-embedding-3-small)
-- **NIH/NSF**: Grant support [grant numbers]
-- **Emory Research Computing**: GPU resources
-
----
-
-## Version History
-
-- **v1.0.0** (2025-01-XX): Initial public release
-- Core pipeline implementation
-- Toy data example
-- Comprehensive documentation
-
-See [CHANGES.md](CHANGES.md) for detailed version history.
 
 ---
 

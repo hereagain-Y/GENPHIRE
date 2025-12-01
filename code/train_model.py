@@ -495,19 +495,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example:
-  python train_model.py --input data/toy_embeddings.csv --output_dir results --phenotype diabetes
+  python train_model.py \
+      --input data/toy_embeddings.csv \
+      --labels data/toy_phenotype.csv \
+      --output_dir results \
+      --phenotype diabetes
         """
     )
     
     # Data arguments
     parser.add_argument('--input', required=True, help='Path to embeddings CSV file')
+    parser.add_argument('--labels', required=True, help='Path to phenotype labels CSV file')
+    parser.add_argument('--label_col', default='disease_status', help='Label column name in labels file')
     parser.add_argument('--output_dir', default='results', help='Output directory')
     parser.add_argument('--phenotype', default='simulated_disease', help='Phenotype/disease name')
     parser.add_argument('--embedding_col', default='embedding', help='Embedding column name')
     parser.add_argument('--id_col', default='ID', help='ID column name')
     
-    # Label arguments
-    parser.add_argument('--n_classes', type=int, default=2, help='Number of classes')
+    # Split arguments
     parser.add_argument('--test_size', type=float, default=0.2, help='Test set proportion')
     parser.add_argument('--val_size', type=float, default=0.1, help='Validation proportion')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
@@ -544,8 +549,26 @@ Example:
     # Step 1: Load embeddings
     X, ids, df = load_embeddings(args.input, embedding_col=args.embedding_col, id_col=args.id_col)
     
-    # Step 2: Generate simulated labels (or load real labels)
-    y = simulate_phenotype_labels(len(X), n_classes=args.n_classes, seed=args.seed)
+    # Step 2: Load phenotype labels
+    print(f"\nLoading phenotype labels from: {args.labels}")
+    labels_df = pd.read_csv(args.labels)
+    print(f"Loaded {len(labels_df)} labels")
+    
+    # Merge with embeddings on ID
+    merged_df = df[[args.id_col, args.embedding_col]].merge(
+        labels_df[[args.id_col, args.label_col]], 
+        on=args.id_col, 
+        how='inner'
+    )
+    print(f"Matched {len(merged_df)} samples with both embeddings and labels")
+    
+    # Extract matched data
+    X = np.stack(merged_df[args.embedding_col].values)
+    y = merged_df[args.label_col].values
+    ids = merged_df[args.id_col].values
+    
+    print(f"  Cases (positive): {y.sum()}")
+    print(f"  Controls (negative): {len(y) - y.sum()}")
     
     # Step 3: Split and save data
     data_dir = split_and_save_data(
